@@ -1,0 +1,484 @@
+---
+title: "Telco Customer Churn_ Ololade_Akinsanola"
+format: 
+  html:
+    self-contained: true
+    embed-resources: true
+editor: visual
+execute: 
+  eval: true
+  echo: true
+---
+
+#### Title: Telco Customer Churn
+
+**Data set Overview**
+
+The Telco Customer Churn data set contains 7,043 customers with 21 features, including both categorical (e.g., gender, senior citizen status) and numerical variables (e.g., tenure, monthly charges, total charges). The binary target variable, Churn, indicates whether a customer has left the service (1) or stayed (0).
+
+### Load Data
+
+```{r}
+library(tidyverse)
+telco <- read.csv("Data/Telco.csv")
+```
+
+### Data Cleaning
+
+```{r}
+# Handle missing values in TotalCharges
+telco$TotalCharges[is.na(telco$TotalCharges)] <- median(telco$TotalCharges, na.rm = TRUE)
+
+
+# Convert them to factors
+# List of categorical columns to be converted to factors
+categorical_columns <- c("gender", "SeniorCitizen", "Partner", "Dependents", "PhoneService", 
+                         "MultipleLines", "InternetService", "OnlineSecurity", "OnlineBackup", 
+                         "DeviceProtection", "TechSupport", "StreamingTV", "StreamingMovies", 
+                         "Contract", "PaperlessBilling", "PaymentMethod", "Churn")
+
+# Convert each specified column to factor
+for(col in categorical_columns) {
+  telco[[col]] <- factor(telco[[col]])
+}
+
+# Check for duplicates 
+duplicates <- duplicated(telco)
+duplicate_rows <- telco[duplicates, ]
+duplicate_rows
+
+# Remove unnecessary columns
+telco <- telco[, !(names(telco) == "customerID")]
+
+# Check for data structure
+str(telco)
+```
+
+### Descriptive Statistics
+
+##### Check for Churn class imbalance
+
+```{r}
+# Check the distribution of Churn
+table(telco$Churn)
+
+# Calculate the proportion of each class
+prop.table(table(telco$Churn))
+
+
+# Visualize the class distribution
+ggplot(telco, aes(x = Churn)) + geom_bar() + labs(title = "Class Distribution of Churn")
+```
+
+##### For Numerical Variables
+
+```{r}
+summary(telco[, c("tenure", "MonthlyCharges", "TotalCharges")])
+
+# Additional measures like standard deviation and variance
+sapply(telco[, c("tenure", "MonthlyCharges", "TotalCharges")], sd)
+sapply(telco[, c("tenure", "MonthlyCharges", "TotalCharges")], var)
+```
+
+##### For Categorical Variables
+
+```{r}
+# List of categorical variables
+categorical_vars <- c("gender", "SeniorCitizen", "Partner", "Dependents", "PhoneService", 
+                      "MultipleLines", "InternetService", "OnlineSecurity", "OnlineBackup", 
+                      "DeviceProtection", "TechSupport", "StreamingTV", "StreamingMovies", 
+                      "Contract", "PaperlessBilling", "PaymentMethod", "Churn")
+
+# Apply the table() function to each categorical variable and store the result in a list
+categorical_tables <- lapply(telco[categorical_vars], table)
+
+# Print each table in the list
+for (var in categorical_tables) {
+  print(var)
+  cat("\n\n")
+}
+```
+
+```{r}
+# Apply prop.table() to each categorical variable and store the result in a list
+categorical_proportions <- lapply(telco[categorical_vars], function(x) prop.table(table(x)))
+
+# Print each proportion table with a header
+for (var_name in names(categorical_proportions)) {
+  cat("\nProportions for", var_name, ":\n")
+  print(categorical_proportions[[var_name]])
+  cat("\n\n")
+}
+```
+
+### Data Visualization
+
+##### For Numerical Variables
+
+```{r}
+# Histograms
+hist(telco$MonthlyCharges, main="Distribution of Monthly Charges", xlab="Monthly Charges")
+hist(telco$TotalCharges, main="Distribution of Total Charges", xlab="Total Charges")
+hist(telco$tenure, main="Distribution of Tenure", xlab="Tenure")
+
+# Box plots 
+boxplot(telco$MonthlyCharges, main="Boxplot of Monthly Charges")
+boxplot(telco$TotalCharges, main="Boxplot of Total Charges")
+boxplot(telco$tenure, main="Boxplot of Tenure")
+```
+
+##### For Categorical Variables
+
+```{r}
+# Bar plots 
+barplot(table(telco$gender), main="Gender Distribution", col="lightblue")
+barplot(table(telco$SeniorCitizen), main="Senior Citizen Distribution", col="coral")
+barplot(table(telco$Partner), main="Partner Distribution", col="lightgreen")
+barplot(table(telco$Dependents), main="Dependents Distribution", col="orange")
+barplot(table(telco$PhoneService), main="Phone Service Distribution", col="lightpink")
+barplot(table(telco$MultipleLines), main="Multiple Lines Distribution", col="lightyellow")
+barplot(table(telco$InternetService), main="Internet Service Distribution", col="red")
+barplot(table(telco$OnlineSecurity), main="Online Security Distribution", col="darkgreen")
+barplot(table(telco$OnlineBackup), main="Online Backup Distribution", col="blue")
+barplot(table(telco$DeviceProtection), main="Device ProtectionDistribution", col="brown")
+barplot(table(telco$TechSupport), main="Tech Support Distribution", col="purple")
+barplot(table(telco$StreamingTV), main="Streaming TV Distribution", col="darkblue")
+barplot(table(telco$StreamingMovies), main="Streaming Movies Distribution", col="black")
+barplot(table(telco$Contract), main="Contract Distribution", col="grey")
+barplot(table(telco$PaperlessBilling), main="Paperless Billing Distribution", col="violet")
+barplot(table(telco$PaymentMethod), main="Payment Method Distribution", col="yellow")
+barplot(table(telco$Churn), main="Churn Distribution", col="lightcoral")
+```
+
+#### Check for Outliers
+
+```{r}
+# Calculate IQR for a numeric variable 
+# Tenure
+Q1 <- quantile(telco$tenure, 0.25)
+Q3 <- quantile(telco$tenure, 0.75)
+IQR_value <- IQR(telco$tenure)
+
+# Define outlier thresholds
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+
+# Identify outliers
+outliers <- telco$tenure[telco$tenure < lower_bound | telco$tenure > upper_bound]
+outliers
+
+# Monthly Charges
+Q1 <- quantile(telco$MonthlyCharges, 0.25)
+Q3 <- quantile(telco$MonthlyCharges, 0.75)
+IQR_value <- IQR(telco$MonthlyCharges)
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+outliers <- telco$MonthlyCharges[telco$MonthlyCharges < lower_bound | telco$MonthlyCharges > upper_bound]
+outliers
+
+# Total Charges
+Q1 <- quantile(telco$TotalCharges, 0.25)
+Q3 <- quantile(telco$TotalCharges, 0.75)
+IQR_value <- IQR(telco$TotalCharges)
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+outliers <- telco$TotalCharges[telco$TotalCharges < lower_bound | telco$TotalCharges > upper_bound]
+outliers
+```
+
+#### Visualizing Relationship between Churn and other Variables
+
+##### Churn vs Numeric Variables
+
+```{r}
+# Churn and Monthly Charges 
+ggplot(telco, aes(x = Churn, y = MonthlyCharges, fill = Churn)) +
+  geom_boxplot() +
+  labs(title = "Churn vs Monthly Charges", x = "Churn", y = "Monthly Charges")
+
+# Churn and Tenure
+ggplot(telco, aes(x = Churn, y = tenure, fill = Churn)) +
+  geom_boxplot() +
+  labs(title = "Churn vs Tenure", x = "Churn", y = "Tenure")
+
+# Churn and Total Charges
+ggplot(telco, aes(x = Churn, y = TotalCharges, fill = Churn)) +
+  geom_boxplot() +
+  labs(title = "Churn vs Total Charges", x = "Churn", y = "Total Charges")
+```
+
+##### Churn vs Categorical variables
+
+```{r}
+# List of categorical variables
+cat_vars <- c("gender","SeniorCitizen","Partner","Dependents","PhoneService", "MultipleLines", "InternetService", 
+              "OnlineSecurity", "OnlineBackup", "DeviceProtection", "TechSupport", 
+              "StreamingTV", "StreamingMovies", "Contract", "PaperlessBilling", 
+              "PaymentMethod")
+
+# Loop through each categorical variable and create a plot
+for (var in cat_vars) {
+  print(
+    ggplot(telco, aes_string(x = var, fill = "Churn")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Churn vs", var), y = "Proportion", x = var) +
+      scale_fill_manual(values = c("No" = "blue", "Yes" = "red")) +
+      theme_minimal()
+  )
+}
+```
+
+#### Checking for correlation between Numerical Variables
+
+##### Correlation Matrix
+
+```{r}
+# Calculate correlation matrix for numerical variables
+numerical_vars <- telco[, c("tenure", "MonthlyCharges", "TotalCharges")]
+correlation_matrix <- cor(numerical_vars)
+correlation_matrix
+
+# Visualize the correlation matrix with ggplot2
+library(corrplot)
+corrplot(correlation_matrix, method = "color", type = "upper", tl.col = "black")
+```
+
+#### Model Building
+
+##### Logistic Regression Model
+
+```{r}
+mod <- glm(Churn ~ ., telco, family= binomial())
+summary(mod)
+```
+
+##### Checking and adding Possible Polynomial terms
+
+```{r}
+# Visual check of linearity in logit for continuous variable
+Telco <- telco
+Telco$Churn_binary <- ifelse(Telco$Churn == "Yes", 1, 0)
+
+
+# Churn vs Tenure
+ggplot(Telco, aes(x = tenure, y = as.numeric(Churn_binary))) + geom_point() +
+  geom_smooth(method = "glm", se = FALSE, method.args = list(family="binomial")) +
+  labs(title = "Smoothed relationship between Tenure and Churn")
+
+# Churn vs Monthly Charges 
+ggplot(Telco, aes(x = MonthlyCharges, y = as.numeric(Churn_binary))) + geom_point() +
+  geom_smooth(method = "glm", se = FALSE, method.args = list(family="binomial")) +
+  labs(title = "Smoothed relationship between Tenure and Churn")
+
+# Churn vs Total Charges
+ggplot(Telco, aes(x = TotalCharges, y = as.numeric(Churn_binary))) + geom_point() +
+  geom_smooth(method = "glm", se = FALSE, method.args = list(family="binomial")) +
+  labs(title = "Smoothed relationship between Tenure and Churn")
+```
+
+```{r}
+# Adding quadratic and cubic terms
+mod_poly <- glm(Churn ~ . + tenure^2 + tenure^3 + MonthlyCharges^2 + TotalCharges^2, telco, family= binomial())
+summary(mod_poly)
+
+# Compare with previous model using AIC
+AIC(mod, mod_poly)
+
+```
+
+##### Variance Inflation Factor (VIF) for Multicollinearity
+
+```{r}
+library(car)
+
+alias(mod)
+
+# Removing correlated and insignificant variables (phone service, Online security, online backup, Device Protection, Tech Support, Streaming tv, streaming movies) based on business logic
+mod_red <- glm(Churn ~ gender + SeniorCitizen + Partner + Dependents + tenure + MultipleLines + InternetService + Contract + PaperlessBilling + PaymentMethod + MonthlyCharges + TotalCharges, data = telco, family = binomial())
+
+summary(mod_red)
+alias(mod_red)
+vif(mod_red)
+
+AIC(mod, mod_poly, mod_red)
+```
+
+##### Checking for interaction terms
+
+```{r}
+mod_int <- glm(Churn ~ .*. , telco, family = binomial())
+summary(mod_int)
+```
+
+### Variable Selection: Using stepwise selection
+
+##### Comparing the Models
+
+```{r}
+# Applying stepwise to each model fitted above to see which fits best
+mod_best_1 <- step(mod, direction = "both", trace =0)
+summary(mod_best_1)
+```
+
+```{r}
+mod_best_2 <- step(mod_red, direction = "both", trace =0)
+summary(mod_best_2)
+```
+
+```{r}
+# from the interaction term fitted above
+mod_int_new <- glm(Churn ~ tenure + OnlineBackup + MonthlyCharges + TotalCharges + gender*TotalCharges + SeniorCitizen*PaymentMethod + tenure*PhoneService + tenure*MultipleLines + tenure*InternetService + tenure*OnlineSecurity + tenure*OnlineBackup + tenure*DeviceProtection + tenure*TechSupport + tenure*StreamingTV + tenure*StreamingMovies + tenure*Contract + tenure*MonthlyCharges + tenure*TotalCharges + PhoneService*TotalCharges,family = binomial(),data = telco)
+
+mod_best_int <- step(mod_int_new, direction = "both", trace =0)
+summary(mod_best_int)
+```
+
+##### Final Model
+
+```{r}
+# Final Model
+mod_final <- glm(Churn ~ tenure + OnlineBackup + MonthlyCharges +  MultipleLines + InternetService + DeviceProtection +  StreamingTV + StreamingMovies + Contract + SeniorCitizen:PaymentMethod +  tenure:Contract + tenure:TotalCharges,family = binomial(), data = telco)
+summary(mod_final)
+```
+
+```{r}
+# Odds Ratios of final mod
+exp(coef(mod_final))
+```
+
+### Model Diagnostics
+
+##### Goodness of Fit
+
+```{r}
+# Using Hosmer-Lemeshow test
+library(ResourceSelection)
+
+# If Churn is still a factor, convert it
+telco$Churn_binary <- ifelse(telco$Churn == "Yes", 1, 0)
+
+# Apply test
+hoslem_test <- hoslem.test(telco$Churn_binary, fitted(mod_final), g = 10)
+print(hoslem_test)
+```
+
+```{r}
+# Goodness-of-Fit: Hosmer-Lemeshow Test
+
+# Convert Churn to binary if it's not already (1 = Yes, 0 = No)
+telco$Churn_binary <- ifelse(telco$Churn == "Yes", 1, 0)
+
+# Fit the final logistic regression model again for clarity
+mod_final <- glm(Churn_binary ~ tenure + OnlineBackup + MonthlyCharges + MultipleLines + 
+                   InternetService + DeviceProtection + StreamingTV + StreamingMovies + 
+                   Contract + SeniorCitizen:PaymentMethod + tenure:Contract + tenure:TotalCharges, 
+                 data = telco, family = binomial())
+
+# Load the ResourceSelection package
+library(ResourceSelection)
+
+# Hosmer-Lemeshow Test (g = 10 groups)
+hoslem.test(telco$Churn_binary, fitted(mod_final), g = 10)
+```
+
+```{r}
+# AIC and BIC for Model Fit
+AIC(mod_final)
+BIC(mod_final)
+```
+
+##### Residual Analysis
+
+```{r}
+# Deviance residuals vs. predicted values
+plot(predict(mod_final, type = "link"), residuals(mod_final, type = "deviance"),
+     xlab = "Linear Predictor", ylab = "Deviance Residuals", main = "Deviance Residuals vs Predictor")
+abline(h = 0, col = "red")
+```
+
+### Confidence Interval
+
+```{r}
+# Using profile and Wald's CI
+confint(mod_final)  # Profile likelihood
+confint.default(mod_final)  # Wald
+```
+
+Calculate 95% Wald and profile confidence intervals for the parameter associated with (a) Monthly charges (b) Tenure. Interpret the intervals in the context of the problem.
+
+```{r}
+# Wald confidence interval for MonthlyCharges
+est <- coef(mod_final)["MonthlyCharges"]
+var_est <- vcov(mod_final)["MonthlyCharges", "MonthlyCharges"]
+alpha <- 0.05
+crit <- qnorm(1 - alpha / 2)
+est + c(-1, 1) * crit * sqrt(var_est)
+
+# Profile likelihood confidence interval for MonthlyCharges
+confint(mod_final, "MonthlyCharges")
+
+
+# Wald confidence interval for tenure
+est <- coef(mod_final)["tenure"]
+var_est <- vcov(mod_final)["tenure", "tenure"]
+alpha <- 0.05
+crit <- qnorm(1 - alpha / 2)
+est + c(-1, 1) * crit * sqrt(var_est)
+
+# Profile likelihood confidence interval for tenure
+confint(mod_final, "tenure")
+```
+
+```{r}
+# Odds ratio and Wald CI for tenure
+odds_ratio <- exp(est)
+ci_wald <- est + c(-1, 1) * crit * sqrt(var_est)
+ci_wald_exp <- exp(ci_wald)
+
+odds_ratio
+ci_wald_exp
+```
+
+### Hypothesis Testing
+
+```{r}
+# Using ANOVA and Wald's tests
+# Calculate Chi-Square statistic
+chi2 <- mod_final$null.deviance - deviance(mod_final)
+# Calculate p-value
+p <- pchisq(chi2, df = length(coef(mod_final)) - 1, lower.tail = FALSE)
+p
+anova(mod_final, test = "Chisq")  # Likelihood ratio tests
+
+```
+
+#### Confusion Matrix and Statistics
+
+```{r}
+library(caret)
+predicted <- ifelse(predict(mod_final, type = "response") > 0.5, "Yes", "No")
+confusionMatrix(as.factor(predicted), as.factor(telco$Churn))
+
+```
+
+##### AUC and ROC curve
+
+```{r}
+library(pROC)
+# Get the predicted probabilities (pi-hats)
+pi_hat <- predict(mod_final,type="response")
+
+# roc has two inputs, the actual response and the pi-hats
+roc_obj <- roc(telco$Churn,pi_hat)
+
+auc_value <- auc(roc_obj) 
+data.frame(fpr = 1 -
+             roc_obj$specificities, tpr=
+             roc_obj$sensitivities) %>% 
+  ggplot(aes(x=fpr,y=tpr)) + 
+  geom_line(color="blue") + 
+  geom_abline(slope=1, intercept=0,
+              linetype ="dashed", colour = "red") + 
+  xlab("False Positive Rate") + 
+  ylab("True Positive Rate")
+```
